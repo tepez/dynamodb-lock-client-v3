@@ -1,5 +1,5 @@
 {
-  "name": "@trilogy-group/dynamodb-lock-client-v3",
+  "name": "@tepez/dynamodb-lock-client-v3",
   "version": "1.0.3",
   "description": "A general-purpose distributed locking library built for AWS DynamoDB V3.",
   "types": "types/index.d.ts",
@@ -37,8 +37,5 @@
     "Cooper Bell <john.cooper.bell@gmail.com>",
     "Katarina Golbang"
   ],
-  "license": "MIT",
-  "publishConfig": {
-    "registry": "https://npm.pkg.github.com/"
-  }
+  "license": "MIT"
 }
