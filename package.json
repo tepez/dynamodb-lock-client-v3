@@ -14,10 +14,10 @@
     "jest": "26.0.1"
   },
   "dependencies": {
-    "@hapi/joi": "17.1.1"
+    "joi": "^17.13.3"
   },
   "peerDependencies": {
-    "@aws-sdk/client-dynamodb": "3.17.x"
+    "@aws-sdk/client-dynamodb": "^3.17.0"
   },
   "repository": {
     "type": "git",
