@@ -7,11 +7,13 @@
     "inject-examples": "node scripts/injectExamples.js",
     "prepublishOnly": "npm run inject-examples",
     "readme": "node examples/readme.js",
-    "test": "jest"
+    "test": "jest",
+    "update": "npx np --no-publish --no-yarn --branch tepez"
   },
   "main": "index.js",
   "devDependencies": {
-    "jest": "26.0.1"
+    "jest": "26.0.1",
+    "np": "^10.0.7"
   },
   "dependencies": {
     "joi": "^17.13.3"
