@@ -39,9 +39,9 @@ describe("FailOpen lock acquisition", () =>
             };
             dynamodb =
             {
-                deleteItem: () => {},
-                getItem: () => {},
-                putItem: () => {}
+                deleteItem: async () => {},
+                getItem: async () => {},
+                putItem: async () => {}
             }
         }
     );
@@ -56,7 +56,7 @@ describe("FailOpen lock acquisition", () =>
                     config.dynamodb = Object.assign(
                         dynamodb,
                         {
-                            getItem(params, callback)
+                            async getItem(params)
                             {
                                 expect(params).toEqual(
                                     {
@@ -69,7 +69,7 @@ describe("FailOpen lock acquisition", () =>
                                     }
                                 );
                                 finish();
-                                return callback(error);
+                                throw error;
                             }
                         }
                     );
@@ -90,7 +90,9 @@ describe("FailOpen lock acquisition", () =>
                         dynamodb = Object.assign(
                             dynamodb,
                             {
-                                getItem: (_, callback) => callback(undefined, {})
+                                getItem: async () => {
+                                    return {};
+                                }
                             }
                         );
                     }
@@ -104,7 +106,7 @@ describe("FailOpen lock acquisition", () =>
                             config.dynamodb = Object.assign(
                                 dynamodb,
                                 {
-                                    putItem(params, callback)
+                                    async putItem(params)
                                     {
                                         expect(params).toEqual(
                                             {
@@ -125,7 +127,7 @@ describe("FailOpen lock acquisition", () =>
                                             }
                                         );
                                         finish();
-                                        return callback(error);
+                                        throw error;
                                     }
                                 }
                             );
@@ -157,7 +159,7 @@ describe("FailOpen lock acquisition", () =>
                                 config.dynamodb = Object.assign(
                                     dynamodb,
                                     {
-                                        putItem(params, callback)
+                                        async putItem(params)
                                         {
                                             expect(params).toEqual(
                                                 {
@@ -179,7 +181,7 @@ describe("FailOpen lock acquisition", () =>
                                                 }
                                             );
                                             finish();
-                                            return callback(error);
+                                            throw error;
                                         }
                                     }
                                 );
@@ -207,7 +209,9 @@ describe("FailOpen lock acquisition", () =>
                                 dynamodb = Object.assign(
                                     dynamodb,
                                     {
-                                        putItem: (_, callback) => callback(error)
+                                        putItem: async () => {
+                                            throw error;
+                                        }
                                     }
                                 );
                             }
@@ -222,12 +226,12 @@ describe("FailOpen lock acquisition", () =>
                                     config.dynamodb = Object.assign(
                                         dynamodb,
                                         {
-                                            getItem(params, callback)
+                                            async getItem(params)
                                             {
                                                 if (++callCount == 1)
                                                 {
                                                     finish();
-                                                    return callback(undefined, {}); // no item
+                                                    return {}; // no item
                                                 }
                                                 expect(params).toEqual(
                                                     {
@@ -240,7 +244,7 @@ describe("FailOpen lock acquisition", () =>
                                                     }
                                                 );
                                                 finish();
-                                                return callback(err);
+                                                throw err;
                                             }
                                         }
                                     );
@@ -287,7 +291,9 @@ describe("FailOpen lock acquisition", () =>
                             config.dynamodb = Object.assign(
                                 dynamodb,
                                 {
-                                    putItem: (_, callback) => callback()
+                                    putItem: async () => {
+
+                                    }
                                 }
                             );
                             const failOpen = new DynamoDBLockClient.FailOpen(config);
@@ -338,11 +344,11 @@ describe("FailOpen lock acquisition", () =>
                         dynamodb = Object.assign(
                             dynamodb,
                             {
-                                getItem: (_, callback) => callback(undefined,
-                                    {
+                                getItem: async () => {
+                                    return {
                                         Item: existingItem
-                                    }
-                                )
+                                    };
+                                }
                             }
                         );
                     }
@@ -356,7 +362,7 @@ describe("FailOpen lock acquisition", () =>
                             config.dynamodb = Object.assign(
                                 dynamodb,
                                 {
-                                    putItem(params, callback)
+                                    async putItem(params)
                                     {
                                         expect(params).toEqual(
                                             {
@@ -383,7 +389,7 @@ describe("FailOpen lock acquisition", () =>
                                         );
                                         expect(params.Item.guid).not.toEqual(existingItem.guid.S);
                                         finish();
-                                        return callback(error);
+                                        throw error;
                                     }
                                 }
                             );
@@ -415,7 +421,7 @@ describe("FailOpen lock acquisition", () =>
                                 config.dynamodb = Object.assign(
                                     dynamodb,
                                     {
-                                        putItem(params, callback)
+                                        async putItem(params)
                                         {
                                             expect(params).toEqual(
                                                 {
@@ -442,7 +448,7 @@ describe("FailOpen lock acquisition", () =>
                                                 }
                                             );
                                             finish();
-                                            return callback(error);
+                                            throw error;
                                         }
                                     }
                                 );
@@ -470,7 +476,9 @@ describe("FailOpen lock acquisition", () =>
                                 dynamodb = Object.assign(
                                     dynamodb,
                                     {
-                                        putItem: (_, callback) => callback(error)
+                                        putItem: async () => {
+                                            throw error;
+                                        }
                                     }
                                 );
                             }
@@ -485,12 +493,12 @@ describe("FailOpen lock acquisition", () =>
                                     config.dynamodb = Object.assign(
                                         dynamodb,
                                         {
-                                            getItem(params, callback)
+                                            async getItem(params)
                                             {
                                                 if (++callCount == 1)
                                                 {
                                                     finish();
-                                                    return callback(undefined, {}); // no item
+                                                    return {}; // no item
                                                 }
                                                 expect(params).toEqual(
                                                     {
@@ -503,7 +511,7 @@ describe("FailOpen lock acquisition", () =>
                                                     }
                                                 );
                                                 finish();
-                                                return callback(err);
+                                                throw err;
                                             }
                                         }
                                     );
@@ -551,10 +559,9 @@ describe("FailOpen lock acquisition", () =>
                             config.dynamodb = Object.assign(
                                 dynamodb,
                                 {
-                                    putItem(params, callback)
+                                    async putItem(params)
                                     {
                                         newGUID = params.Item.guid.S;
-                                        return callback();
                                     }
                                 }
                             );
@@ -625,7 +632,7 @@ describe("FailOpen lock acquisition", () =>
                     config.dynamodb = Object.assign(
                         dynamodb,
                         {
-                            getItem(params, callback)
+                            async getItem(params)
                             {
                                 expect(params).toEqual(
                                     {
@@ -639,7 +646,7 @@ describe("FailOpen lock acquisition", () =>
                                     }
                                 );
                                 finish();
-                                return callback(error);
+                                throw error;
                             }
                         }
                     );
@@ -665,7 +672,9 @@ describe("FailOpen lock acquisition", () =>
                         dynamodb = Object.assign(
                             dynamodb,
                             {
-                                getItem: (_, callback) => callback(undefined, {})
+                                getItem: async () => {
+                                    return {};
+                                }
                             }
                         );
                     }
@@ -679,7 +688,7 @@ describe("FailOpen lock acquisition", () =>
                             config.dynamodb = Object.assign(
                                 dynamodb,
                                 {
-                                    putItem(params, callback)
+                                    async putItem(params)
                                     {
                                         expect(params).toEqual(
                                             {
@@ -702,7 +711,7 @@ describe("FailOpen lock acquisition", () =>
                                             }
                                         );
                                         finish();
-                                        return callback(error);
+                                        throw error;
                                     }
                                 }
                             );
@@ -735,7 +744,7 @@ describe("FailOpen lock acquisition", () =>
                                 config.dynamodb = Object.assign(
                                     dynamodb,
                                     {
-                                        putItem(params, callback)
+                                        async putItem(params)
                                         {
                                             expect(params).toEqual(
                                                 {
@@ -759,7 +768,7 @@ describe("FailOpen lock acquisition", () =>
                                                 }
                                             );
                                             finish();
-                                            return callback(error);
+                                            throw error;
                                         }
                                     }
                                 );
@@ -788,7 +797,9 @@ describe("FailOpen lock acquisition", () =>
                                 dynamodb = Object.assign(
                                     dynamodb,
                                     {
-                                        putItem: (_, callback) => callback(error)
+                                        putItem: async () => {
+                                            throw error;
+                                        }
                                     }
                                 );
                             }
@@ -803,12 +814,12 @@ describe("FailOpen lock acquisition", () =>
                                     config.dynamodb = Object.assign(
                                         dynamodb,
                                         {
-                                            getItem(params, callback)
+                                            async getItem(params)
                                             {
                                                 if (++callCount == 1)
                                                 {
                                                     finish();
-                                                    return callback(undefined, {}); // no item
+                                                    return {}; // no item
                                                 }
                                                 expect(params).toEqual(
                                                     {
@@ -822,7 +833,7 @@ describe("FailOpen lock acquisition", () =>
                                                     }
                                                 );
                                                 finish();
-                                                return callback(err);
+                                                throw err;
                                             }
                                         }
                                     );
@@ -875,7 +886,9 @@ describe("FailOpen lock acquisition", () =>
                             config.dynamodb = Object.assign(
                                 dynamodb,
                                 {
-                                    putItem: (_, callback) => callback()
+                                    putItem: async () => {
+
+                                    }
                                 }
                             );
                             const failOpen = new DynamoDBLockClient.FailOpen(config);
@@ -934,11 +947,11 @@ describe("FailOpen lock acquisition", () =>
                         dynamodb = Object.assign(
                             dynamodb,
                             {
-                                getItem: (_, callback) => callback(undefined,
-                                    {
+                                getItem: async () => {
+                                    return {
                                         Item: existingItem
-                                    }
-                                )
+                                    };
+                                }
                             }
                         );
                     }
@@ -952,7 +965,7 @@ describe("FailOpen lock acquisition", () =>
                             config.dynamodb = Object.assign(
                                 dynamodb,
                                 {
-                                    putItem(params, callback)
+                                    async putItem(params)
                                     {
                                         expect(params).toEqual(
                                             {
@@ -981,7 +994,7 @@ describe("FailOpen lock acquisition", () =>
                                         );
                                         expect(params.Item.guid).not.toEqual(existingItem.guid);
                                         finish();
-                                        return callback(error);
+                                        throw error;
                                     }
                                 }
                             );
@@ -1014,7 +1027,7 @@ describe("FailOpen lock acquisition", () =>
                                 config.dynamodb = Object.assign(
                                     dynamodb,
                                     {
-                                        putItem(params, callback)
+                                        async putItem(params)
                                         {
                                             expect(params).toEqual(
                                                 {
@@ -1043,7 +1056,7 @@ describe("FailOpen lock acquisition", () =>
                                                 }
                                             );
                                             finish();
-                                            return callback(error);
+                                            throw error;
                                         }
                                     }
                                 );
@@ -1072,7 +1085,9 @@ describe("FailOpen lock acquisition", () =>
                                 dynamodb = Object.assign(
                                     dynamodb,
                                     {
-                                        putItem: (_, callback) => callback(error)
+                                        putItem: async () => {
+                                            throw error;
+                                        }
                                     }
                                 );
                             }
@@ -1087,12 +1102,12 @@ describe("FailOpen lock acquisition", () =>
                                     config.dynamodb = Object.assign(
                                         dynamodb,
                                         {
-                                            getItem(params, callback)
+                                            async getItem(params)
                                             {
                                                 if (++callCount == 1)
                                                 {
                                                     finish();
-                                                    return callback(undefined, {}); // no item
+                                                    return {}; // no item
                                                 }
                                                 expect(params).toEqual(
                                                     {
@@ -1106,7 +1121,7 @@ describe("FailOpen lock acquisition", () =>
                                                     }
                                                 );
                                                 finish();
-                                                return callback(err);
+                                                throw err;
                                             }
                                         }
                                     );
@@ -1160,10 +1175,9 @@ describe("FailOpen lock acquisition", () =>
                             config.dynamodb = Object.assign(
                                 dynamodb,
                                 {
-                                    putItem(params, callback)
+                                    async putItem(params)
                                     {
                                         newGUID = params.Item.guid.S;
-                                        return callback();
                                     }
                                 }
                             );
@@ -1226,9 +1240,9 @@ describe("FailOpen lock release", () =>
             };
             dynamodb =
             {
-                deleteItem: () => {},
-                getItem: () => {},
-                putItem: () => {}
+                deleteItem: async () => {},
+                getItem: async () => {},
+                putItem: async () => {}
             }
         }
     );
@@ -1263,7 +1277,7 @@ describe("FailOpen lock release", () =>
                     config.dynamodb = Object.assign(
                         dynamodb,
                         {
-                            putItem(params, callback)
+                            async putItem(params)
                             {
                                 expect(params).toEqual(
                                     {
@@ -1288,7 +1302,7 @@ describe("FailOpen lock release", () =>
                                     }
                                 );
                                 finish();
-                                return callback(error);
+                                throw error;
                             }
                         }
                     );
@@ -1336,7 +1350,7 @@ describe("FailOpen lock release", () =>
                 config.dynamodb = Object.assign(
                     dynamodb,
                     {
-                        putItem(params, callback)
+                        async putItem(params)
                         {
                             expect(params).toEqual(
                                 {
@@ -1363,7 +1377,7 @@ describe("FailOpen lock release", () =>
                                 }
                             );
                             finish();
-                            return callback(error);
+                            throw error;
                         }
                     }
                 );

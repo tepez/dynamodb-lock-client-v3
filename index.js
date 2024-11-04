@@ -65,7 +65,7 @@ FailClosed.prototype.acquireLock = function(id, callback)
         }
     ));
     workflow.on("start", dataBag => workflow.emit("acquire lock", dataBag));
-    workflow.on("acquire lock", dataBag =>
+    workflow.on("acquire lock", async (dataBag) =>
         {
             const params =
             {
@@ -83,40 +83,39 @@ FailClosed.prototype.acquireLock = function(id, callback)
             {
                 params.Item[self._config.sortKey] = { S: dataBag.sortID };
             }
-            self._config.dynamodb.putItem(params, (error, data) =>
+
+            try {
+                await self._config.dynamodb.putItem(params);
+            } catch (error) {
+                if (error.code === "ConditionalCheckFailedException")
                 {
-                    if (error)
+                    if (dataBag.retryCount > 0)
                     {
-                        if (error.code === "ConditionalCheckFailedException")
-                        {
-                            if (dataBag.retryCount > 0)
-                            {
-                                return workflow.emit("retry acquire lock", dataBag);
-                            }
-                            else
-                            {
-                                const err = new Error("Failed to acquire lock.");
-                                err.code = "FailedToAcquireLock";
-                                err.originalError = error;
-                                return callback(err);
-                            }
-                        }
-                        return callback(error);
+                        return workflow.emit("retry acquire lock", dataBag);
                     }
-                    return callback(undefined, new Lock(
-                        {
-                            dynamodb: self._config.dynamodb,
-                            guid: dataBag.guid,
-                            lockTable: self._config.lockTable,
-                            partitionID: dataBag.partitionID,
-                            partitionKey: self._config.partitionKey,
-                            sortID: dataBag.sortID,
-                            sortKey: self._config.sortKey,
-                            type: FailClosed
-                        }
-                    ));
+                    else
+                    {
+                        const err = new Error("Failed to acquire lock.");
+                        err.code = "FailedToAcquireLock";
+                        err.originalError = error;
+                        return callback(err);
+                    }
                 }
-            );
+                return callback(error);
+            }
+
+            return callback(undefined, new Lock(
+                {
+                    dynamodb: self._config.dynamodb,
+                    guid: dataBag.guid,
+                    lockTable: self._config.lockTable,
+                    partitionID: dataBag.partitionID,
+                    partitionKey: self._config.partitionKey,
+                    sortID: dataBag.sortID,
+                    sortKey: self._config.sortKey,
+                    type: FailClosed
+                }
+            ));
         }
     );
     workflow.on("retry acquire lock", dataBag =>
@@ -220,7 +219,7 @@ FailOpen.prototype.acquireLock = function(id, callback)
         }
     ));
     workflow.on("start", dataBag => workflow.emit("check for existing lock", dataBag));
-    workflow.on("check for existing lock", dataBag =>
+    workflow.on("check for existing lock", async (dataBag) =>
         {
             const params =
             {
@@ -235,40 +234,40 @@ FailOpen.prototype.acquireLock = function(id, callback)
             {
                 params.Key[self._config.sortKey] = { S: dataBag.sortID };
             }
-            self._config.dynamodb.getItem(params, (error, data) =>
-                {
-                    if (error)
-                    {
-                        return callback(error);
-                    }
-                    if (!data.Item)
-                    {
-                        dataBag.fencingToken = 1;
-                        return workflow.emit("acquire new lock", dataBag);
-                    }
-                    dataBag.lock = data.Item;
-                    dataBag.fencingToken = parseInt(dataBag.lock.fencingToken.N) + 1;
-                    const leaseDurationMs = parseInt(dataBag.lock.leaseDurationMs.N);
-                    let timeout;
-                    if (self._config.trustLocalTime)
-                    {
-                        const lockAcquiredTimeUnixMs = parseInt(dataBag.lock.lockAcquiredTimeUnixMs?.N ?? 0);
-                        const localTimeUnixMs = (new Date()).getTime();
-                        timeout = Math.max(0, leaseDurationMs - (localTimeUnixMs - lockAcquiredTimeUnixMs));
-                    }
-                    else
-                    {
-                        timeout = leaseDurationMs;
-                    }
-                    return setTimeout(
-                        () => workflow.emit("acquire existing lock", dataBag),
-                        timeout
-                    );
-                }
+
+            let data;
+            try {
+                data = await self._config.dynamodb.getItem(params);
+            } catch (error) {
+                return callback(error);
+            }
+
+            if (!data.Item)
+            {
+                dataBag.fencingToken = 1;
+                return workflow.emit("acquire new lock", dataBag);
+            }
+            dataBag.lock = data.Item;
+            dataBag.fencingToken = parseInt(dataBag.lock.fencingToken.N) + 1;
+            const leaseDurationMs = parseInt(dataBag.lock.leaseDurationMs.N);
+            let timeout;
+            if (self._config.trustLocalTime)
+            {
+                const lockAcquiredTimeUnixMs = parseInt(dataBag.lock.lockAcquiredTimeUnixMs?.N ?? 0);
+                const localTimeUnixMs = (new Date()).getTime();
+                timeout = Math.max(0, leaseDurationMs - (localTimeUnixMs - lockAcquiredTimeUnixMs));
+            }
+            else
+            {
+                timeout = leaseDurationMs;
+            }
+            return setTimeout(
+                () => workflow.emit("acquire existing lock", dataBag),
+                timeout
             );
         }
     );
-    workflow.on("acquire new lock", dataBag =>
+    workflow.on("acquire new lock", async (dataBag) =>
         {
             const params =
             {
@@ -292,33 +291,32 @@ FailOpen.prototype.acquireLock = function(id, callback)
             {
                 params.Item[self._config.sortKey] = { S: dataBag.sortID };
             }
-            self._config.dynamodb.putItem(params, (error, data) =>
+
+            try {
+                await self._config.dynamodb.putItem(params);
+            } catch (error) {
+                if (error.code === "ConditionalCheckFailedException")
                 {
-                    if (error)
+                    if (dataBag.retryCount > 0)
                     {
-                        if (error.code === "ConditionalCheckFailedException")
-                        {
-                            if (dataBag.retryCount > 0)
-                            {
-                                dataBag.retryCount--;
-                                return workflow.emit("check for existing lock", dataBag);
-                            }
-                            else
-                            {
-                                const err = new Error("Failed to acquire lock.");
-                                err.code = "FailedToAcquireLock";
-                                err.originalError = error;
-                                return callback(err);
-                            }
-                        }
-                        return callback(error);
+                        dataBag.retryCount--;
+                        return workflow.emit("check for existing lock", dataBag);
                     }
-                    return workflow.emit("configure acquired lock", dataBag);
+                    else
+                    {
+                        const err = new Error("Failed to acquire lock.");
+                        err.code = "FailedToAcquireLock";
+                        err.originalError = error;
+                        return callback(err);
+                    }
                 }
-            );
+                return callback(error);
+            }
+
+            return workflow.emit("configure acquired lock", dataBag);
         }
     );
-    workflow.on("acquire existing lock", dataBag =>
+    workflow.on("acquire existing lock", async (dataBag) =>
         {
             const params =
             {
@@ -347,30 +345,29 @@ FailOpen.prototype.acquireLock = function(id, callback)
             {
                 params.Item[self._config.sortKey] = { S: dataBag.sortID };
             }
-            self._config.dynamodb.putItem(params, (error, data) =>
+
+            try {
+                await self._config.dynamodb.putItem(params);
+            } catch (error) {
+                if (error.code === "ConditionalCheckFailedException")
                 {
-                    if (error)
+                    if (dataBag.retryCount > 0)
                     {
-                        if (error.code === "ConditionalCheckFailedException")
-                        {
-                            if (dataBag.retryCount > 0)
-                            {
-                                dataBag.retryCount--;
-                                return workflow.emit("check for existing lock", dataBag);
-                            }
-                            else
-                            {
-                                const err = new Error("Failed to acquire lock.");
-                                err.code = "FailedToAcquireLock";
-                                err.originalError = error;
-                                return callback(err);
-                            }
-                        }
-                        return callback(error);
+                        dataBag.retryCount--;
+                        return workflow.emit("check for existing lock", dataBag);
                     }
-                    return workflow.emit("configure acquired lock", dataBag);
+                    else
+                    {
+                        const err = new Error("Failed to acquire lock.");
+                        err.code = "FailedToAcquireLock";
+                        err.originalError = error;
+                        return callback(err);
+                    }
                 }
-            );
+                return callback(error);
+            }
+
+            return workflow.emit("configure acquired lock", dataBag);
         }
     );
     workflow.on("configure acquired lock", dataBag =>
@@ -413,8 +410,7 @@ const Lock = function(config)
 
     if (self._config.heartbeatPeriodMs)
     {
-        const refreshLock = function()
-        {
+        const refreshLock = async () => {
             const newGuid = crypto.randomBytes(64).toString("base64");
             const params =
             {
@@ -442,19 +438,18 @@ const Lock = function(config)
             {
                 params.Item[self._config.sortKey] = { S: self._config.sortID };
             }
-            self._config.dynamodb.putItem(params, (error, data) =>
-                {
-                    if (error)
-                    {
-                        return self.emit("error", error);
-                    }
-                    self._guid = newGuid;
-                    if (!self._released) // See https://github.com/tristanls/dynamodb-lock-client/issues/1
-                    {
-                        self.heartbeatTimeout = setTimeout(refreshLock, self._config.heartbeatPeriodMs);
-                    }
-                }
-            );
+
+            try {
+                await self._config.dynamodb.putItem(params);
+            } catch (error) {
+                return self.emit("error", error);
+            }
+
+            self._guid = newGuid;
+            if (!self._released) // See https://github.com/tristanls/dynamodb-lock-client/issues/1
+            {
+                self.heartbeatTimeout = setTimeout(refreshLock, self._config.heartbeatPeriodMs);
+            }
         };
         self.heartbeatTimeout = setTimeout(refreshLock, self._config.heartbeatPeriodMs);
     }
@@ -481,7 +476,7 @@ Lock.prototype.release = function(callback)
     }
 };
 
-Lock.prototype._releaseFailClosed = function(callback)
+Lock.prototype._releaseFailClosed = async function(callback)
 {
     const self = this;
     const params =
@@ -502,21 +497,24 @@ Lock.prototype._releaseFailClosed = function(callback)
     {
         params.Key[self._config.sortKey] = { S: self._config.sortID };
     }
-    self._config.dynamodb.deleteItem(params, (error, data) =>
+
+    try {
+        await self._config.dynamodb.deleteItem(params);
+    } catch (error) {
+        if (error && error.code === "ConditionalCheckFailedException")
         {
-            if (error && error.code === "ConditionalCheckFailedException")
-            {
-                const err = new Error("Failed to release lock.");
-                err.code = "FailedToReleaseLock";
-                err.originalError = error;
-                return callback(err);
-            }
-            return callback(error);
+            const err = new Error("Failed to release lock.");
+            err.code = "FailedToReleaseLock";
+            err.originalError = error;
+            return callback(err);
         }
-    );
+        return callback(error);
+    }
+
+    callback();
 };
 
-Lock.prototype._releaseFailOpen = function(callback)
+Lock.prototype._releaseFailOpen = async function(callback)
 {
     const self = this;
     const params =
@@ -545,16 +543,19 @@ Lock.prototype._releaseFailOpen = function(callback)
     {
         params.Item[self._config.sortKey] = { S: self._config.sortID };
     }
-    self._config.dynamodb.putItem(params, (error, data) =>
+
+    try {
+        await self._config.dynamodb.putItem(params);
+    } catch (error) {
+        if (error && error.code === "ConditionalCheckFailedException")
         {
-            if (error && error.code === "ConditionalCheckFailedException")
-            {
-                // another process may have claimed lock already
-                return callback();
-            }
-            return callback(error);
+            // another process may have claimed lock already
+            return callback();
         }
-    );
+        return callback(error);
+    }
+
+    callback();
 
 };
 
